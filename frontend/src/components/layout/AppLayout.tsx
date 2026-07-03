@@ -81,10 +81,10 @@ export default function AppLayout() {
               fontSize: 18,
             }}
           >
-            G
+            A
           </Box>
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 800, letterSpacing: "-0.3px" }}>
-            GetYourGuide
+            Aptino
             <Typography component="span" sx={{ fontWeight: 500, opacity: 0.85, ml: 1, fontSize: 13 }}>
               WFM Request Portal
             </Typography>

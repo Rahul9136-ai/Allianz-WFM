@@ -60,10 +60,10 @@ export default function LoginPage() {
               mb: 1.5,
             }}
           >
-            G
+            A
           </Box>
           <Typography variant="h5" fontWeight={800} sx={{ letterSpacing: "-0.5px" }}>
-            GetYourGuide
+            Aptino
           </Typography>
           <Typography variant="body2" color="text.secondary">
             WFM Request Portal · Sign in to continue

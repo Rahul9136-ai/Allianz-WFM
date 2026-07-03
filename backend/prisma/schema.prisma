@@ -1,0 +1,313 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------------
+// Enums
+// ------------------------------------------------------------------
+
+enum Role {
+  OPERATIONS
+  WFM
+  ADMIN
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum RequestStatus {
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  WAITING_FOR_INFORMATION
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+enum SlaStatus {
+  WITHIN_SLA
+  AT_RISK
+  OVERDUE
+  MET
+  BREACHED
+}
+
+enum NotificationType {
+  TICKET_CREATED
+  TICKET_ASSIGNED
+  STATUS_UPDATED
+  COMMENT_ADDED
+  TICKET_UPDATED
+  TICKET_COMPLETED
+  TICKET_REJECTED
+  TICKET_CANCELLED
+  MENTION
+}
+
+enum NotificationChannel {
+  EMAIL
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+// ------------------------------------------------------------------
+// Users & Roles
+// ------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  role         Role     @default(OPERATIONS)
+  isActive     Boolean  @default(true)
+  avatarUrl    String?
+  azureAdOid   String?  @unique
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  requestsCreated   Request[]        @relation("RequestCreatedBy")
+  requestsAssigned  Request[]        @relation("RequestAssignedTo")
+  comments          Comment[]
+  attachmentsUploaded Attachment[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  requestHistory    RequestHistory[]
+
+  @@map("users")
+}
+
+// ------------------------------------------------------------------
+// Reference data
+// ------------------------------------------------------------------
+
+model Category {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  isActive  Boolean   @default(true)
+  slaHours  Int       @default(48)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  requests  Request[]
+
+  @@map("categories")
+}
+
+model Vendor {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  requests  Request[]
+
+  @@map("vendors")
+}
+
+model SlaRule {
+  id         String   @id @default(uuid())
+  priority   Priority @unique
+  hoursToRespond Int  @default(4)
+  hoursToResolve Int  @default(48)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("sla_rules")
+}
+
+model EmailTemplate {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  subject   String
+  bodyHtml  String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("email_templates")
+}
+
+// ------------------------------------------------------------------
+// Requests (Tickets)
+// ------------------------------------------------------------------
+
+model Request {
+  id             String        @id @default(uuid())
+  ticketNumber   String        @unique // WFM-000001
+  categoryId     String
+  category       Category      @relation(fields: [categoryId], references: [id])
+  vendorId       String
+  vendor         Vendor        @relation(fields: [vendorId], references: [id])
+  effectiveDate  DateTime
+  description    String
+  teamLeaderName  String
+  teamLeaderEmail String
+  agentName      String
+  agentEmail     String
+  agentId        String
+  priority       Priority      @default(MEDIUM)
+  status         RequestStatus @default(PENDING)
+
+  createdById    String
+  createdBy      User          @relation("RequestCreatedBy", fields: [createdById], references: [id])
+  assignedToId   String?
+  assignedTo     User?         @relation("RequestAssignedTo", fields: [assignedToId], references: [id])
+
+  internalNotes  String?
+  estimatedCompletionDate DateTime?
+  completionDate DateTime?
+
+  firstResponseAt DateTime?
+  slaDueAt       DateTime?
+  slaStatus      SlaStatus     @default(WITHIN_SLA)
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  comments       Comment[]
+  attachments    Attachment[]
+  history        RequestHistory[]
+  auditLogs      AuditLog[]
+  notifications  Notification[]
+
+  @@index([status])
+  @@index([priority])
+  @@index([vendorId])
+  @@index([categoryId])
+  @@index([assignedToId])
+  @@index([createdById])
+  @@map("requests")
+}
+
+model TicketSequence {
+  id     Int @id @default(1)
+  lastValue Int @default(0)
+
+  @@map("ticket_sequence")
+}
+
+// ------------------------------------------------------------------
+// Comments (conversation thread)
+// ------------------------------------------------------------------
+
+model Comment {
+  id         String   @id @default(uuid())
+  requestId  String
+  request    Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User     @relation(fields: [authorId], references: [id])
+  body       String
+  isInternal Boolean  @default(false)
+  mentions   String[] @default([])
+  createdAt  DateTime @default(now())
+
+  attachments Attachment[]
+
+  @@index([requestId])
+  @@map("comments")
+}
+
+// ------------------------------------------------------------------
+// Attachments
+// ------------------------------------------------------------------
+
+model Attachment {
+  id           String   @id @default(uuid())
+  requestId    String
+  request      Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  commentId    String?
+  comment      Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  fileName     String
+  storedName   String
+  mimeType     String
+  sizeBytes    Int
+  storageDriver String  @default("local")
+  storagePath  String
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([requestId])
+  @@map("attachments")
+}
+
+// ------------------------------------------------------------------
+// Notifications (email + in-app)
+// ------------------------------------------------------------------
+
+model Notification {
+  id        String              @id @default(uuid())
+  userId    String
+  user      User                @relation(fields: [userId], references: [id])
+  requestId String?
+  request   Request?            @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  channel   NotificationChannel @default(EMAIL)
+  status    NotificationStatus  @default(PENDING)
+  subject   String
+  body      String
+  isRead    Boolean             @default(false)
+  error     String?
+  sentAt    DateTime?
+  createdAt DateTime            @default(now())
+
+  @@index([userId])
+  @@index([requestId])
+  @@map("notifications")
+}
+
+// ------------------------------------------------------------------
+// Audit Trail (immutable) + per-request history timeline
+// ------------------------------------------------------------------
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  requestId  String?
+  request    Request? @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  entityType String
+  entityId   String
+  oldValue   String?
+  newValue   String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([requestId])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+model RequestHistory {
+  id        String   @id @default(uuid())
+  requestId String
+  request   Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  field     String
+  oldValue  String?
+  newValue  String?
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([requestId])
+  @@map("request_history")
+}

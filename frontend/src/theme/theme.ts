@@ -1,15 +1,16 @@
 import { createTheme } from "@mui/material/styles";
 
 export const BRAND = {
-  primary: "#C7272F",
-  primaryDark: "#A31F26",
+  // Allianz corporate blue
+  primary: "#003781",
+  primaryDark: "#002A66",
   secondary: "#5B5B5B",
   background: "#FFFFFF",
   lightGrey: "#F5F5F5",
   borderGrey: "#DDDDDD",
   success: "#2E7D32",
   warning: "#ED6C02",
-  error: "#C7272F",
+  error: "#D32F2F",
 };
 
 export const theme = createTheme({

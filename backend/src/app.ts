@@ -22,6 +22,10 @@ import dashboardRoutes from "./modules/dashboard/dashboard.routes";
 export function createApp() {
   const app = express();
 
+  // Behind Railway's / any reverse proxy: trust the first proxy hop so
+  // express-rate-limit and req.ip use the real client IP from X-Forwarded-For.
+  app.set("trust proxy", 1);
+
   // Relax cross-origin isolation headers so the browser can read API responses
   // when the frontend is served from a different origin (local dev on :5190).
   app.use(

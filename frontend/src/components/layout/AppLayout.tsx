@@ -84,7 +84,7 @@ export default function AppLayout() {
             A
           </Box>
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 800, letterSpacing: "-0.3px" }}>
-            Aptino
+            Allianz
             <Typography component="span" sx={{ fontWeight: 500, opacity: 0.85, ml: 1, fontSize: 13 }}>
               WFM Request Portal
             </Typography>

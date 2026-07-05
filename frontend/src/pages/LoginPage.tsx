@@ -63,7 +63,7 @@ export default function LoginPage() {
             A
           </Box>
           <Typography variant="h5" fontWeight={800} sx={{ letterSpacing: "-0.5px" }}>
-            Aptino
+            Allianz
           </Typography>
           <Typography variant="body2" color="text.secondary">
             WFM Request Portal · Sign in to continue

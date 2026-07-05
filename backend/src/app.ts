@@ -4,6 +4,8 @@ import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
+import path from "path";
+import fs from "fs";
 import { env } from "./config/env";
 import { errorHandler, notFoundHandler } from "./middleware/error";
 
@@ -20,10 +22,8 @@ import dashboardRoutes from "./modules/dashboard/dashboard.routes";
 export function createApp() {
   const app = express();
 
-  const allowedOrigins = env.corsOrigin.split(",").map((o) => o.trim());
-  // This is a JSON API consumed from a separate frontend origin, so relax the
-  // cross-origin isolation headers that would otherwise block browser reads.
-  // CORS (below) remains the access-control boundary.
+  // Relax cross-origin isolation headers so the browser can read API responses
+  // when the frontend is served from a different origin (local dev on :5190).
   app.use(
     helmet({
       contentSecurityPolicy: false,
@@ -31,15 +31,10 @@ export function createApp() {
       crossOriginOpenerPolicy: false,
     })
   );
-  app.use(
-    cors({
-      origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-        return callback(new Error(`Origin not allowed by CORS: ${origin}`));
-      },
-      credentials: true,
-    })
-  );
+  // Auth uses Bearer tokens from localStorage (not cookies), so we can safely
+  // reflect the request origin. This keeps local multi-port dev working and
+  // needs no CORS config in production where the SPA is same-origin.
+  app.use(cors({ origin: true, credentials: true }));
   app.use(express.json({ limit: "2mb" }));
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser());
@@ -58,6 +53,20 @@ export function createApp() {
   app.use("/api/notifications", notificationRoutes);
   app.use("/api/audit-logs", auditRoutes);
   app.use("/api/dashboard", dashboardRoutes);
+
+  // In production the built React app is served from the same origin. The
+  // location is set via CLIENT_DIST_DIR (Docker) and falls back to the repo
+  // layout for a local production build.
+  const clientDir = process.env.CLIENT_DIST_DIR || path.resolve(process.cwd(), "../frontend/dist");
+  if (fs.existsSync(path.join(clientDir, "index.html"))) {
+    app.use(express.static(clientDir));
+    // SPA fallback: any non-API GET returns index.html so client-side routing works.
+    app.get("*", (req, res, next) => {
+      if (req.path.startsWith("/api")) return next();
+      res.sendFile(path.join(clientDir, "index.html"));
+    });
+    console.log(`Serving frontend from ${clientDir}`);
+  }
 
   app.use(notFoundHandler);
   app.use(errorHandler);

@@ -1,0 +1,14 @@
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+!**/.env.example
+**/uploads/*
+!**/uploads/.gitkeep
+**/emails
+.git
+.github
+docs
+*.md
+_srv.*.txt
+.claude
